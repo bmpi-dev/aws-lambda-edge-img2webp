@@ -1,0 +1,53 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: 'AWS::Serverless-2016-10-31'
+Description: Rewrite jpg and png requests to webp if the browser supports webp
+Resources:
+  ViewerRequestFunction:
+    Type: 'AWS::Serverless::Function'
+    Properties:
+      CodeUri: s3://bmpidev-aws-lambda-edge/viewer-request-function.zip
+      Handler: index.handler
+      Runtime: nodejs10.x
+      Timeout: 5
+      Role: !GetAtt WebpExecutionRole.Arn
+      FunctionName: WebpTransformRequest
+  OriginResponseFunction:
+    Type: 'AWS::Serverless::Function'
+    Properties:
+      CodeUri: s3://bmpidev-aws-lambda-edge/origin-response-function.zip
+      Handler: index.handler
+      Runtime: nodejs10.x
+      Timeout: 5
+      Role: !GetAtt WebpExecutionRole.Arn
+      FunctionName: WebpTransformResponse
+
+  # ==== ROLES ==== #
+  WebpExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+        - Effect: Allow
+          Action: sts:AssumeRole
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+            - edgelambda.amazonaws.com
+
+  # ==== POLICIES ==== #
+  PublishLogsPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: Allows functions to write logs
+      Roles:
+      - !Ref WebpExecutionRole
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Resource: '*'

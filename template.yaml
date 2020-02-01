@@ -1,0 +1,127 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Transform: AWS::Serverless-2016-10-31
+
+Resources:
+  ImageBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    Properties:
+      AccessControl: PublicRead
+      BucketName: !Sub image-resize-${AWS::AccountId}-${AWS::Region}
+
+  ImageBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ImageBucket
+      PolicyDocument:
+        Statement:
+            - Action:
+                - s3:GetObject
+              Effect: Allow
+              Principal: "*"
+              Resource: !Sub arn:aws:s3:::${ImageBucket}/*
+            - Action:
+                - s3:PutObject
+              Effect: Allow
+              Principal:
+                AWS: !GetAtt EdgeLambdaRole.Arn
+              Resource: !Sub arn:aws:s3:::${ImageBucket}/*
+            - Action:
+                - s3:GetObject
+              Effect: Allow
+              Principal:
+                AWS: !GetAtt EdgeLambdaRole.Arn
+              Resource: !Sub arn:aws:s3:::${ImageBucket}/*
+
+  EdgeLambdaRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+            Effect: "Allow"
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+                - "edgelambda.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Path: "/service-role/"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+
+  ViewerRequestFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: s3://<code-bucket>/viewer-request-function.zip
+      Handler: index.handler
+      Runtime: nodejs6.10
+      MemorySize: 128
+      Timeout: 1
+      Role: !GetAtt EdgeLambdaRole.Arn
+
+  ViewerRequestFunctionVersion:
+    Type: "AWS::Lambda::Version"
+    Properties:
+      FunctionName: !Ref ViewerRequestFunction
+      Description: "A version of ViewerRequestFunction"
+
+  OriginResponseFunction:
+   Type: AWS::Serverless::Function
+   Properties:
+     CodeUri: s3://<code-bucket>/origin-response-function.zip
+     Handler: index.handler
+     Runtime: nodejs6.10
+     MemorySize: 512
+     Timeout: 5
+     Role: !GetAtt EdgeLambdaRole.Arn
+
+  OriginResponseFunctionVersion:
+    Type: "AWS::Lambda::Version"
+    Properties:
+      FunctionName: !Ref OriginResponseFunction
+      Description: "A version of OriginResponseFunction"
+
+  MyDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Origins:
+        - DomainName: !Sub ${ImageBucket}.s3.amazonaws.com
+          Id: myS3Origin
+          S3OriginConfig: {}
+        Enabled: 'true'
+        Comment: distribution for content delivery
+        DefaultRootObject: index.html
+        DefaultCacheBehavior:
+          TargetOriginId: myS3Origin
+          LambdaFunctionAssociations:
+            - EventType: 'viewer-request'
+              LambdaFunctionARN: !Ref ViewerRequestFunctionVersion
+            - EventType: 'origin-response'
+              LambdaFunctionARN: !Ref OriginResponseFunctionVersion
+          ForwardedValues:
+            QueryString: 'true'
+            QueryStringCacheKeys:
+              - d
+            Cookies:
+              Forward: 'none'
+          ViewerProtocolPolicy: allow-all
+          MinTTL: '100'
+          SmoothStreaming: 'false'
+          Compress: 'true'
+        PriceClass: PriceClass_All
+        ViewerCertificate:
+          CloudFrontDefaultCertificate: 'true'
+
+Outputs:
+  ImageBucket:
+    Value: !Ref ImageBucket
+    Export:
+      Name: !Sub "${AWS::StackName}-ImageBucket"
+
+  MyDistribution:
+    Value: !Ref MyDistribution
+    Export:
+      Name: !Sub "${AWS::StackName}-MyDistribution"

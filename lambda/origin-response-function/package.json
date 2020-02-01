@@ -1,0 +1,17 @@
+{
+  "name": "build",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "aws-sdk": "^2.610.0",
+    "path": "^0.12.7",
+    "sharp": "^0.24.0"
+  }
+}
