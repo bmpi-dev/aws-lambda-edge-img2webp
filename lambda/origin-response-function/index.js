@@ -3,21 +3,28 @@ const AWS = require('aws-sdk')
 
 const S3 = new AWS.S3({
   signatureVersion: 'v4',
+  region: 'ap-northeast-1'
 })
 
 const Sharp = require('sharp')
 const BUCKET = 'img.bmpi.dev'
-const QUALITY = 75
+const QUALITY = 70
 
 exports.handler = async (event, context, callback) => {
+  
+  // log for debug
+  // console.info("ENVIRONMENT VARIABLES\n" + JSON.stringify(process.env, null, 2))
+  // console.info("EVENT\n" + JSON.stringify(event, null, 2))
+
   const { request, response } = event.Records[0].cf
   const { uri } = request
   const headers = response.headers
 
   if (path.extname(uri) === '.webp') {
-    if (response.status === 404) {
-      const format = reqeust.headers['original-resource-type'] && reqeust.headers['original-resource-type'][0]
-        ? request.headers['resource-type'][0].value.replace('image/', '')
+    // if s3 bucket is private, it will return 403
+    if (response.status === "404" || response.status === "403") {
+      const format = request.headers['original-resource-type'] && request.headers['original-resource-type'][0]
+        ? request.headers['original-resource-type'][0].value.replace('image/', '')
         : null
 
       const key = uri.substring(1)
@@ -34,8 +41,9 @@ exports.handler = async (event, context, callback) => {
           Bucket: BUCKET,
           ContentType: 'image/webp',
           CacheControl: 'max-age=31536000',
-          Key,
-          StorageClass: 'STANDARD'
+          Key: key,
+          StorageClass: 'STANDARD',
+          ACL: 'public-read'
         }).promise()
 
         response.status = 200
@@ -52,6 +60,9 @@ exports.handler = async (event, context, callback) => {
       }]
     }
   }
+
+  // log for debug
+  // console.info("RESPONSE\n" + JSON.stringify(response, null, 2))
 
   callback(null, response)
  }

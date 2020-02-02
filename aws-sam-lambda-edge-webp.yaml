@@ -10,7 +10,7 @@ Resources:
       Runtime: nodejs10.x
       Timeout: 5
       Role: !GetAtt WebpExecutionRole.Arn
-      FunctionName: WebpTransformRequest
+      FunctionName: bmpidevImgTransformRequest
   OriginResponseFunction:
     Type: 'AWS::Serverless::Function'
     Properties:
@@ -19,7 +19,7 @@ Resources:
       Runtime: nodejs10.x
       Timeout: 5
       Role: !GetAtt WebpExecutionRole.Arn
-      FunctionName: WebpTransformResponse
+      FunctionName: bmpidevImgTransformResponse
 
   # ==== ROLES ==== #
   WebpExecutionRole:
